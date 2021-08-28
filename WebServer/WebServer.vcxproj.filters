@@ -32,5 +32,8 @@
     <ClInclude Include="Methods.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Request.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
