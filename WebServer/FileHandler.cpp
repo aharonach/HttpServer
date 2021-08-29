@@ -4,16 +4,9 @@
 #include <ostream>
 #include <istream>
 #include "StatusCodes.h"
-
-
 using namespace std;
 
-bool isFileExists(char* path);
-bool createAndWriteIntoAFile(char* path, char* path);
-bool deleteFile(char* path);
-bool writeIntoAFile(fstream file, char* content);
-
-bool isFileExists(char* path) {
+bool isFileExists(string path) {
 	
 	fstream file;
 	bool isExist = flase;
@@ -28,7 +21,7 @@ bool isFileExists(char* path) {
 	return isExist;
 }	
 
-int createAndWriteIntoAFile(char* path, char* content) {
+int createAndWriteIntoAFile(string path, string content) {
 
 	fstream file;
 	int i;
@@ -59,7 +52,7 @@ int createAndWriteIntoAFile(char* path, char* content) {
 	return response;
 }
 
-int deleteFile(char* path) {
+int deleteFile(string path) {
 
 	fstream file;
 	int i;
@@ -78,7 +71,7 @@ int deleteFile(char* path) {
 	return response;
 }
 
-int writeIntoAFile(fstream file, char* content) {
+int writeIntoAFile(fstream file, string content) {
 
 	int isSuccessful = -1;
 	int len = strlen(content);
@@ -93,11 +86,3 @@ int writeIntoAFile(fstream file, char* content) {
 
 	return isSuccessful;
 }
-
-
-
-
-
-
-
-

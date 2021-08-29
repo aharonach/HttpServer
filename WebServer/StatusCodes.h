@@ -71,3 +71,24 @@ enum StatusType
 	CLIENT_ERROR = 400,
 	SERVER_ERROR = 500
 };
+
+//Response headers
+#define	ACCEPT_RANGES "Accept-Ranges"
+#define	AGE "Age"
+#define	ETAG "ETag"
+#define	LOCATION "Location"
+#define	PROXY_AUTHENTICATE "Proxy-Authenticate"
+#define	RETRY_AFTER "Retry-After"
+#define	SERVER "Server"
+#define	VARY "Vary"
+#define	WWW_AUTHENTICATE "WWW-Authenticate"
+#define	ALLOW "Allow"
+#define	CONTENT_ENCODING "Content-Encoding"
+#define	CONTENT_LANGUAGE "Content-Language"
+#define	CONTENT_LENGTH "Content-Length"
+#define	CONTENT_LOCATION "Content-Location"
+#define	CONTENT_MD5 "Content-MD5"
+#define	CONTENT_RANGE "Content-Range"
+#define	CONTENT_TYPE "Content-Type"
+#define	EXPIRES "Expires"
+#define	LAST_MODIFIED "Last-Modified"
