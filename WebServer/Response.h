@@ -1,6 +1,8 @@
 #include <iostream>
 #include "StatusCodes.h"
 #include <map>
+#include <sstream>
+
 
 using namespace std;
 
@@ -14,8 +16,6 @@ private:
 	int statusCode;
 	map<string, string> headers;
 	string body;
-
-	string fullReasponseString;
 
 public:
 	

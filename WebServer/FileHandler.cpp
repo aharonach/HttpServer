@@ -26,8 +26,7 @@ int createAndWriteIntoAFile(string path, string content) {
 	fstream file;
 	int i;
 	int response = HTTP_Not_Found;
-	int isWriteSuccessful = -1;
-	
+	int isWriteSuccessful = -1;	
 	bool isExits = isFileExists(path);
 
 	file.open(path, ios_base::out);

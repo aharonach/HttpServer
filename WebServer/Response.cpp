@@ -66,15 +66,15 @@ void Response::setBody(string body)
 	this->body = body;
 }
 
-stringstream Response::createReponseString()
+string Response::createReponseString()
 {
-	stringstream fullResponse;
+	stringstream stringCreator;
 	
-	fullResponse << "HTTP/" << this->httpVersion << " " << this->statusCode << " " << this->reasonPhrase << "\n";	
+	stringCreator << "HTTP/" << this->httpVersion << " " << this->statusCode << " " << this->reasonPhrase << "\n";	
 	for (auto const& header : this->headers) {
-		fullResponse << header.first << ": " << header.second << "\n";
+		stringCreator << header.first << ": " << header.second << "\n";
 	}	
-	fullResponse << "\n" << this->body << "\n";
+	stringCreator << "\n" << this->body << "\n";
 
-	return fullReasponseString;
+	return stringCreator.str();
 }
