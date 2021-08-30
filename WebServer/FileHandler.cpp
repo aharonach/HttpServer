@@ -1,10 +1,39 @@
 #include <iostream>
 #include <fstream>
 #include "StatusCodes.h"
+#include "FileHandler.h"
 
 using namespace std;
 
-int writeIntoAFile(fstream& file, const string& content) {
+string HTTPFileHandler::getFileInStream(const string& path, int* statusCode)
+{
+	fstream file;
+	if(isFileExists(path))
+	{
+		file.open(path, ios_base::in);
+		string stringToReturn((std::istreambuf_iterator<char>(file)),
+			(std::istreambuf_iterator<char>()));
+		if (stringToReturn.size() == 0) 
+		{
+			stringToReturn = "No Content";
+			*statusCode = HTTP_No_Content;
+		}
+		else
+		{
+			*statusCode = HTTP_OK;
+		}
+		return stringToReturn;
+	}
+	else
+	{
+		*statusCode = HTTP_Not_Found;
+		return "Not Found";
+	}
+
+
+}
+
+int HTTPFileHandler::writeIntoAFile(fstream& file, const string& content) {
 
 	int isSuccessful = -1;
 
@@ -16,7 +45,7 @@ int writeIntoAFile(fstream& file, const string& content) {
 	return isSuccessful;
 }
 
-bool isFileExists(const string& path) {
+bool HTTPFileHandler::isFileExists(const string& path) {
 	
 	fstream file;
 	bool isExist = false;
@@ -31,7 +60,7 @@ bool isFileExists(const string& path) {
 	return isExist;
 }	
 
-int createAndWriteIntoAFile(const string& path, const string& content) {
+int HTTPFileHandler::createAndWriteIntoAFile(const string& path, const string& content) {
 
 	fstream file;
 	int response = HTTP_Not_Found;
@@ -60,7 +89,7 @@ int createAndWriteIntoAFile(const string& path, const string& content) {
 	return response;
 }
 
-int deleteFile(const string& path) {
+int HTTPFileHandler::deleteFile(const string& path) {
 
 	fstream file;
 	bool isExists = isFileExists(path);

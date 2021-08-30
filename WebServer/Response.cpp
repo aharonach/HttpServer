@@ -4,10 +4,9 @@
 
 using namespace std;
 //C'tor
-Response::Response(int statusCode)
+Response::Response()
 {
 	setHttpVersion(1.1f);
-	setStatusCode(statusCode);
 }
 
 //D'tor

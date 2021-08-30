@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include "StatusCodes.h"
 #include <map>
@@ -20,7 +22,7 @@ private:
 public:
 	
 	//C'tor
-	Response(int statusCode);
+	Response();
 	
 	//D'tor
 	~Response();
