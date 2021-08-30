@@ -20,7 +20,7 @@ private:
 public:
 	
 	//C'tor
-	Response();
+	Response(int statusCode);
 	
 	//D'tor
 	~Response();
@@ -30,19 +30,16 @@ public:
 	string getReasonPhrase() const;
 	int getStatusCode() const;
 	map<string, string> getHeaders() const;
-	string getBody() const;
+	const string& getBody() const;
 
 	//Setters
 	void setHttpVersion(float version);
-	void setReasonPhrase(string reasonPhrase);
+	void setReasonPhrase(const string& reasonPhrase);
 	void setStatusCode(int statusCode);
-	void setHeaderInMap(string key, string value);
-	void setBody(string body);
+	void setHeaderInMap(const string& key, const string& value);
+	void setBody(const string& body);
 
 	string createReponseString();
-
-private:
-
 
 };
 

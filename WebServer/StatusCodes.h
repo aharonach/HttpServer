@@ -1,3 +1,5 @@
+#pragma once
+
 // 200 Codes
 #define HTTP_OK 200
 #define HTTP_Created 201

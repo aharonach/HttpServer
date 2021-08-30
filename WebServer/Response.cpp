@@ -4,8 +4,10 @@
 
 using namespace std;
 //C'tor
-Response::Response() 
+Response::Response(int statusCode)
 {
+	setHttpVersion(1.1f);
+	setStatusCode(statusCode);
 }
 
 //D'tor
@@ -27,7 +29,7 @@ string Response::getReasonPhrase() const
 
 int Response::getStatusCode() const
 {
-	return this->statusCode
+	return this->statusCode;
 }
 
 map<string, string> Response::getHeaders() const
@@ -35,7 +37,7 @@ map<string, string> Response::getHeaders() const
 	return this->headers;
 }
 
-string Response::getBody() const
+const string& Response::getBody() const
 {
 	return this->body;
 }
@@ -46,7 +48,7 @@ void Response::setHttpVersion(float version)
 	this->httpVersion = version;
 }
 
-void Response::setReasonPhrase(string reasonPhrase)
+void Response::setReasonPhrase(const string& reasonPhrase)
 {
 	this->reasonPhrase = reasonPhrase;
 }
@@ -56,12 +58,12 @@ void Response::setStatusCode(int statusCode)
 	this->statusCode = statusCode;
 }
 
-void Response::setHeaderInMap(string key, string value)
+void Response::setHeaderInMap(const string & key, const string& value)
 {
-	this->headers.insert(key, value);
+	this->headers.insert(make_pair(key, value));
 }
 
-void Response::setBody(string body)
+void Response::setBody(const string & body)
 {
 	this->body = body;
 }
@@ -70,11 +72,11 @@ string Response::createReponseString()
 {
 	stringstream stringCreator;
 	
-	stringCreator << "HTTP/" << this->httpVersion << " " << this->statusCode << " " << this->reasonPhrase << "\n";	
+	stringCreator << "HTTP/" << this->httpVersion << " " << this->statusCode << " " << this->reasonPhrase << "\r\n";	
 	for (auto const& header : this->headers) {
-		stringCreator << header.first << ": " << header.second << "\n";
+		stringCreator << header.first << ": " << header.second << "\r\n";
 	}	
-	stringCreator << "\n" << this->body << "\n";
+	stringCreator << "\r\n" << this->body << "\r\n";
 
 	return stringCreator.str();
 }

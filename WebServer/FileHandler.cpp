@@ -1,9 +1,20 @@
 #include <iostream>
-#include "Methods.h"
 #include <fstream>
 #include "StatusCodes.h"
 
 using namespace std;
+
+int writeIntoAFile(fstream& file, const string& content) {
+
+	int isSuccessful = -1;
+
+	if (file.is_open()) {
+		file << content;
+		isSuccessful = content.size();
+	}
+
+	return isSuccessful;
+}
 
 bool isFileExists(const string& path) {
 	
@@ -23,7 +34,6 @@ bool isFileExists(const string& path) {
 int createAndWriteIntoAFile(const string& path, const string& content) {
 
 	fstream file;
-	int i;
 	int response = HTTP_Not_Found;
 	int isWriteSuccessful = -1;	
 	bool isExits = isFileExists(path);
@@ -35,7 +45,7 @@ int createAndWriteIntoAFile(const string& path, const string& content) {
 			response = HTTP_OK;
 		}
 		else if (isWriteSuccessful == 0) {
-			response == HTTP_Created;
+			response = HTTP_Created;
 		}
 		else
 		{
@@ -66,20 +76,4 @@ int deleteFile(const string& path) {
 	}
 	
 	return response;
-}
-
-int writeIntoAFile(fstream & file, const string& content) {
-
-	int isSuccessful = -1;
-	int len = content.size();
-
-	if (file.is_open()) {
-		for (int i = 0; i < len; i++)
-		{
-			file << content[i];
-		}
-		isSuccessful = len;
-	}
-
-	return isSuccessful;
 }

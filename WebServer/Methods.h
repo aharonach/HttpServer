@@ -2,7 +2,9 @@
 
 #include <string>
 
-enum eMethod
+using namespace std;
+
+enum class eMethod
 {
 	HTTP_GET = 1,
 	HTTP_POST,
@@ -13,10 +15,8 @@ enum eMethod
 	HTTP_TRACE
 };
 
-eMethod parseMethod(const string& method)
+eMethod parseMethod(const string & method)
 {
-	eMethod method;
-
 	if ("GET" == method)
 		return eMethod::HTTP_GET;
 
@@ -35,6 +35,6 @@ eMethod parseMethod(const string& method)
 	else if ("OPTIONS" == method)
 		return eMethod::HTTP_OPTIONS;
 
-	else if ("TRACE" == method)
+	else
 		return eMethod::HTTP_TRACE;
 }
