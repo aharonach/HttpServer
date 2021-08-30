@@ -2,7 +2,7 @@
 
 Request::Request(const string& rawRequest)
 {
-	this->rawReqeust = rawReqeust;
+	this->rawRequest = rawRequest;
 	this->parseRequest();
 }
 
@@ -17,27 +17,27 @@ eMethod Request::getMethod() const
 	return this->method;
 }
 
-string Request::getPath() const
+const string& Request::getPath() const
 {
 	return this->path;
 }
 
-string Request::getQueryParam(const string& field) const
+const string& Request::getQueryParam(const string& field) const
 {
 	return this->queryParams.at(field);
 }
 
-float Request::getHttpVersion() const
+const string& Request::getHttpVersion() const
 {
 	return this->httpVersion;
 }
 
-string Request::getHeader(const string& field) const
+const string& Request::getHeader(const string& field) const
 {
 	return this->headers.at(field);
 }
 
-string Request::getBody() const
+const string& Request::getBody() const
 {
 	return this->body;
 }
@@ -67,21 +67,21 @@ void Request::addHeader(const string& field, const string& value)
 	this->headers.insert(make_pair(field, value));
 }
 
-void Request::setHttpVersion(float version)
+void Request::setHttpVersion(const string& version)
 {
 	this->httpVersion = version;
 }
 
 void Request::parseRequest()
 {
-	stringstream requestStream(this->rawReqeust);
+	stringstream requestStream(this->rawRequest);
 	string requestLine, requestBody;
 
 	getline(requestStream, requestLine);
 
 	for (string line; getline(requestStream, line); )
 	{
-		if (line.find('\n') != string::npos)
+		if (line.find('\r') != string::npos)
 		{
 			line.erase(line.size() - 1);
 		}
@@ -107,7 +107,7 @@ void Request::parseRequest()
 	// Parse the request line (method, path, http version)
 	for (string line; getline(requestLineStream, line, ' '); )
 	{
-		if (line.find('\n') != string::npos)
+		if (line.find('\r') != string::npos)
 		{
 			line.erase(line.size() - 1);
 		}
@@ -137,9 +137,7 @@ void Request::parseRequest()
 		}
 	}
 
-	float httpVersion = stof(requestLineArray[2].substr(requestLineArray[2].find('/') + 1));
-
-	setHttpVersion(httpVersion);
+	setHttpVersion(requestLineArray[2]);
 	setMethod(parseMethod(requestLineArray[0]));
 	setPath(path);
 	setBody(body);

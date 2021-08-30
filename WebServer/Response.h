@@ -13,7 +13,7 @@ class Response
 private:
 	//properties
 
-	float httpVersion;
+	string httpVersion;
 	string reasonPhrase;
 	int statusCode;
 	map<string, string> headers;
@@ -28,14 +28,14 @@ public:
 	~Response();
 	
 	//Getters
-	float getHttpVersion() const;
-	string getReasonPhrase() const;
+	const string& getHttpVersion() const;
+	const string& getReasonPhrase() const;
 	int getStatusCode() const;
 	map<string, string> getHeaders() const;
 	const string& getBody() const;
 
 	//Setters
-	void setHttpVersion(float version);
+	void setHttpVersion(const string& version);
 	void setReasonPhrase(const string& reasonPhrase);
 	void setStatusCode(int statusCode);
 	void setHeaderInMap(const string& key, const string& value);

@@ -21,7 +21,6 @@ struct SocketState
 	int sendSubType;	// Sending sub-type
 	char buffer[1024];
 	vector<Request*> requests;
-	int len;
 };
 
 const int TIME_PORT = 27015;
@@ -38,9 +37,6 @@ void acceptConnection(int index, SocketState* sockets, int* socketsCount);
 void receiveMessage(int index, SocketState* sockets, int* socketsCount);
 void sendMessage(int index, SocketState* sockets);
 
-
-
-
 void main()
 {
 	WSAData wsaData;
@@ -49,7 +45,7 @@ void main()
 
 	if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
-		cout << "Time Server: Error at WSAStartup()\n";
+		cout << "Error at WSAStartup()\n";
 		return;
 	}
 
@@ -57,7 +53,7 @@ void main()
 
 	if (INVALID_SOCKET == listenSocket)
 	{
-		cout << "Time Server: Error at socket(): " << WSAGetLastError() << endl;
+		cout << "Error at socket(): " << WSAGetLastError() << endl;
 		WSACleanup();
 		return;
 	}
@@ -69,7 +65,7 @@ void main()
 
 	if (SOCKET_ERROR == bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)))
 	{
-		cout << "Time Server: Error at bind(): " << WSAGetLastError() << endl;
+		cout << "Error at bind(): " << WSAGetLastError() << endl;
 		closesocket(listenSocket);
 		WSACleanup();
 		return;
@@ -77,7 +73,7 @@ void main()
 
 	if (SOCKET_ERROR == listen(listenSocket, 5))
 	{
-		cout << "Time Server: Error at listen(): " << WSAGetLastError() << endl;
+		cout << "Error at listen(): " << WSAGetLastError() << endl;
 		closesocket(listenSocket);
 		WSACleanup();
 		return;
@@ -106,7 +102,7 @@ void main()
 		nfd = select(0, &waitRecv, &waitSend, NULL, NULL);
 		if (nfd == SOCKET_ERROR)
 		{
-			cout << "Time Server: Error at select(): " << WSAGetLastError() << endl;
+			cout << "Error at select(): " << WSAGetLastError() << endl;
 			WSACleanup();
 			return;
 		}
@@ -144,7 +140,7 @@ void main()
 		}
 	}
 
-	cout << "Time Server: Closing Connection.\n";
+	cout << "Closing Connection.\n";
 	closesocket(listenSocket);
 	WSACleanup();
 }
@@ -158,19 +154,18 @@ bool addSocket(SOCKET id, int what, SocketState* sockets, int* socketsCount)
 			sockets[i].id = id;
 			sockets[i].recv = what;
 			sockets[i].send = IDLE;
-			sockets[i].len = 0;
-			*socketsCount++;
-			return (true);
+			(*socketsCount)++;
+			return true;
 		}
 	}
-	return (false);
+	return false;
 }
 
 void removeSocket(int index, SocketState* sockets, int* socketsCount)
 {
 	sockets[index].recv = EMPTY;
 	sockets[index].send = EMPTY;
-	*socketsCount--;
+	(*socketsCount)--;
 }
 
 void acceptConnection(int index, SocketState* sockets, int* socketsCount)
@@ -182,15 +177,15 @@ void acceptConnection(int index, SocketState* sockets, int* socketsCount)
 	SOCKET msgSocket = accept(id, (struct sockaddr*)&from, &fromLen);
 	if (INVALID_SOCKET == msgSocket)
 	{
-		cout << "Time Server: Error at accept(): " << WSAGetLastError() << endl;
+		cout << "Error at accept(): " << WSAGetLastError() << endl;
 		return;
 	}
-	cout << "Time Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
+	cout << "Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
 
 	unsigned long flag = 1;
 	if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
 	{
-		cout << "Time Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
+		cout << "Error at ioctlsocket(): " << WSAGetLastError() << endl;
 	}
 
 	if (addSocket(msgSocket, RECEIVE, sockets, socketsCount) == false)
@@ -205,12 +200,11 @@ void receiveMessage(int index, SocketState* sockets, int* socketsCount)
 {
 	SOCKET msgSocket = sockets[index].id;
 
-	int len = sockets[index].len;
-	int bytesRecv = recv(msgSocket, &sockets[index].buffer[len], sizeof(sockets[index].buffer) - len, 0);
+	int bytesRecv = recv(msgSocket, sockets[index].buffer, sizeof(sockets[index].buffer) - 1, 0);
 
 	if (SOCKET_ERROR == bytesRecv)
 	{
-		cout << "Time Server: Error at recv(): " << WSAGetLastError() << endl;
+		cout << "Error at recv(): " << WSAGetLastError() << endl;
 		closesocket(msgSocket);
 		removeSocket(index, sockets, socketsCount);
 		return;
@@ -223,12 +217,13 @@ void receiveMessage(int index, SocketState* sockets, int* socketsCount)
 	}
 	else
 	{
-		sockets[index].buffer[len + bytesRecv] = '\0';
-		cout << "Time Server: Recieved: " << bytesRecv << " bytes of \"" << &sockets[index].buffer[len] << "\" message.\n";
+		sockets[index].buffer[bytesRecv] = '\0';
+		cout << "Recieved: " << bytesRecv << " bytes of \"" << sockets[index].buffer << "\" message.\n";
 
-		sockets[index].len += bytesRecv;
-		sockets[index].requests.push_back(new Request(sockets[index].buffer));
+		string buffer(sockets[index].buffer);
 		memset(sockets[index].buffer, 0, sizeof(sockets[index].buffer));
+
+		sockets[index].requests.push_back(new Request(buffer));
 		sockets[index].send = SEND;
 	}
 }
@@ -248,61 +243,62 @@ void sendMessage(int index, SocketState* sockets)
 	//create response
 	
 	Request* requestToHandle = sockets[index].requests.front();
-
+	sockets[index].requests.erase(sockets[index].requests.begin());
 
 	switch (requestToHandle->getMethod())
 	{
-	case eMethod::HTTP_GET:
-	{
-		string file = fileHandler.getFileInStream(requestToHandle->getPath(),&responseCode);
-		if (responseCode == HTTP_Not_Found) 
+		case eMethod::HTTP_GET:
 		{
-			response.setStatusCode(HTTP_Not_Found);
-			response.setHeaderInMap(CONTENT_LENGTH, "0");
-			response.setReasonPhrase("Not Found");
-		}
-		else if (responseCode == HTTP_No_Content)
-		{
-			response.setStatusCode(HTTP_No_Content);
-			response.setHeaderInMap(CONTENT_LENGTH, "0");
-			response.setReasonPhrase("No Content");
-		}
-		else 
-		{
-			response.setStatusCode(HTTP_OK);
-			response.setHeaderInMap(CONTENT_LENGTH, to_string(file.size()));
-			response.setReasonPhrase("ok");
-			response.setBody(file);
-		}
-		break;
-	}
-	case eMethod::HTTP_POST:
-	{
-		break;
-	}
-	case eMethod::HTTP_PUT:
-	{
-		break;
-	}
-	case eMethod::HTTP_DELETE:
-	{
-		break;
-	}
-	case eMethod::HTTP_HEAD:
-	{
-		break;
-	}
-	case eMethod::HTTP_OPTIONS:
-	{
-		break;
-	}
-	case eMethod::HTTP_TRACE:
-	{
-		break;
-	}
+			string file = fileHandler.getFileInStream(requestToHandle->getPath(), &responseCode);
+			response.setStatusCode(responseCode);
+			response.setHeaderInMap(CONTENT_TYPE, "text/html");
 
-	default:
-		break;
+			if (responseCode == HTTP_Not_Found)
+			{
+				response.setHeaderInMap(CONTENT_LENGTH, "0");
+				response.setReasonPhrase("Not Found");
+			}
+			else if (responseCode == HTTP_No_Content)
+			{
+				response.setHeaderInMap(CONTENT_LENGTH, "0");
+				response.setReasonPhrase("No Content");
+			}
+			else
+			{
+				response.setHeaderInMap(CONTENT_LENGTH, to_string(file.size()));
+				response.setReasonPhrase("OK");
+				response.setBody(file);
+			}
+			break;
+		}
+
+		case eMethod::HTTP_POST:
+		{
+			break;
+		}
+	
+		case eMethod::HTTP_PUT:
+	
+			break;
+	
+		case eMethod::HTTP_DELETE:
+	
+			break;
+	
+		case eMethod::HTTP_HEAD:
+	
+			break;
+	
+		case eMethod::HTTP_OPTIONS:
+	
+			break;
+	
+		case eMethod::HTTP_TRACE:
+
+			break;
+
+		default:
+			break;
 	}
 	
 	responseString = response.createReponseString();
@@ -310,14 +306,15 @@ void sendMessage(int index, SocketState* sockets)
 	bytesSent = send(msgSocket, responseString.c_str(), responseString.size(), 0);
 	if (SOCKET_ERROR == bytesSent)
 	{
-		cout << "Time Server: Error at send(): " << WSAGetLastError() << endl;
+		cout << "Error at send(): " << WSAGetLastError() << endl;
 		return;
 	}
 
-	cout << "Time Server: Sent: " << bytesSent << "\\" << responseString.size() << " bytes of \"" << responseString << "\" message.\n";
+	cout << "Sent: " << bytesSent << "\\" << responseString.size() << " bytes of \"" << responseString << "\" message.\n";
 
-	sockets[index].send = IDLE;
-
+	if (sockets[index].requests.empty()) {
+		sockets[index].send = IDLE;
+	}
 }
 
 eMethod parseMethod(const string& method)

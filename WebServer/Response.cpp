@@ -6,7 +6,7 @@ using namespace std;
 //C'tor
 Response::Response()
 {
-	setHttpVersion(1.1f);
+	setHttpVersion("HTTP/1.1");
 }
 
 //D'tor
@@ -16,12 +16,12 @@ Response::~Response()
 }
 
 //Getters
-float Response::getHttpVersion() const
+const string& Response::getHttpVersion() const
 {
 	return this->httpVersion;
 }
 
-string Response::getReasonPhrase() const
+const string& Response::getReasonPhrase() const
 {
 	return this->reasonPhrase;
 }
@@ -42,7 +42,7 @@ const string& Response::getBody() const
 }
 
 //Setters
-void Response::setHttpVersion(float version)
+void Response::setHttpVersion(const string& version)
 {
 	this->httpVersion = version;
 }
@@ -71,11 +71,13 @@ string Response::createReponseString()
 {
 	stringstream stringCreator;
 	
-	stringCreator << "HTTP/" << this->httpVersion << " " << this->statusCode << " " << this->reasonPhrase << "\r\n";	
-	for (auto const& header : this->headers) {
+	stringCreator << getHttpVersion() << " " << getStatusCode() << " " << getReasonPhrase() << "\r\n";
+
+	for (auto const& header : getHeaders()) {
 		stringCreator << header.first << ": " << header.second << "\r\n";
-	}	
-	stringCreator << "\r\n" << this->body << "\r\n";
+	}
+	
+	stringCreator << "\r\n" << getBody() << "\r\n";
 
 	return stringCreator.str();
 }

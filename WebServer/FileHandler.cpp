@@ -8,11 +8,26 @@ using namespace std;
 string HTTPFileHandler::getFileInStream(const string& path, int* statusCode)
 {
 	fstream file;
-	if(isFileExists(path))
+	string finalPath(path);
+
+	if (finalPath.front() == '/')
 	{
-		file.open(path, ios_base::in);
+		finalPath.erase(finalPath.begin());
+	}
+
+	if (finalPath == "")
+	{
+		finalPath = "index.html";
+	}
+
+	if(isFileExists(finalPath))
+	{
+		file.open(finalPath, ios_base::in);
+
+		// covert file to string
 		string stringToReturn((std::istreambuf_iterator<char>(file)),
 			(std::istreambuf_iterator<char>()));
+
 		if (stringToReturn.size() == 0) 
 		{
 			stringToReturn = "No Content";
@@ -29,8 +44,6 @@ string HTTPFileHandler::getFileInStream(const string& path, int* statusCode)
 		*statusCode = HTTP_Not_Found;
 		return "Not Found";
 	}
-
-
 }
 
 int HTTPFileHandler::writeIntoAFile(fstream& file, const string& content) {

@@ -13,14 +13,14 @@ class Request
 {
 private:
 	// Properties
-	string rawReqeust;
+	string rawRequest;
 
 	eMethod method;
 	string path;
 	unordered_map<string, string> queryParams;
 	unordered_map<string, string> headers;
 	string body;
-	float httpVersion;
+	string httpVersion;
 
 	// Private setters, so the request could not be modified outside it.
 	void setMethod(eMethod method);
@@ -28,7 +28,7 @@ private:
 	void setPath(const string& path);
 	void addQueryParam(const string& field, const string& value);
 	void addHeader(const string& field, const string& value);
-	void setHttpVersion(float version);
+	void setHttpVersion(const string& version);
 
 	// Parse the request
 	void parseRequest();
@@ -42,9 +42,9 @@ public:
 
 	// Public getters
 	eMethod getMethod() const;
-	string getPath() const;
-	string getQueryParam(const string& field) const;
-	float getHttpVersion() const;
-	string getHeader(const string& field) const;
-	string getBody() const;
+	const string& getPath() const;
+	const string& getQueryParam(const string& field) const;
+	const string& getHttpVersion() const;
+	const string& getHeader(const string& field) const;
+	const string& getBody() const;
 };
