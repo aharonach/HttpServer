@@ -1,15 +1,14 @@
 #include <iostream>
 #include "Methods.h"
 #include <fstream>
-#include <ostream>
-#include <istream>
 #include "StatusCodes.h"
+
 using namespace std;
 
-bool isFileExists(string path) {
+bool isFileExists(const string& path) {
 	
 	fstream file;
-	bool isExist = flase;
+	bool isExist = false;
 
 	file.open(path, ios_base::_Nocreate);
 	if (file) {
@@ -21,7 +20,7 @@ bool isFileExists(string path) {
 	return isExist;
 }	
 
-int createAndWriteIntoAFile(string path, string content) {
+int createAndWriteIntoAFile(const string& path, const string& content) {
 
 	fstream file;
 	int i;
@@ -51,15 +50,14 @@ int createAndWriteIntoAFile(string path, string content) {
 	return response;
 }
 
-int deleteFile(string path) {
+int deleteFile(const string& path) {
 
 	fstream file;
-	int i;
-	bool isExits = isFileExists(path);
+	bool isExists = isFileExists(path);
 	int response = HTTP_Not_Found;
 
-	if (isExits) {
-		if (remove(path) == 0) {
+	if (isExists) {
+		if (remove(path.c_str()) == 0) {
 			response = HTTP_No_Content;
 		}
 		else {
@@ -70,13 +68,13 @@ int deleteFile(string path) {
 	return response;
 }
 
-int writeIntoAFile(fstream file, string content) {
+int writeIntoAFile(fstream & file, const string& content) {
 
 	int isSuccessful = -1;
-	int len = strlen(content);
+	int len = content.size();
 
 	if (file.is_open()) {
-		for (i = 0; i < len; i++)
+		for (int i = 0; i < len; i++)
 		{
 			file << content[i];
 		}
