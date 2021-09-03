@@ -47,4 +47,5 @@ public:
 	const string& getHttpVersion() const;
 	const string& getHeader(const string& field) const;
 	const string& getBody() const;
+	const string& getRawRequest() const;
 };

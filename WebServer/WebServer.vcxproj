@@ -139,13 +139,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="FileHandler.cpp" />
+    <ClCompile Include="HTTPFileHandler.cpp" />
     <ClCompile Include="Request.cpp" />
     <ClCompile Include="Response.cpp" />
     <ClCompile Include="Server.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="FileHandler.h" />
+    <ClInclude Include="HTTPFileHandler.h" />
     <ClInclude Include="Methods.h" />
     <ClInclude Include="Request.h" />
     <ClInclude Include="Response.h" />

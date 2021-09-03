@@ -11,7 +11,9 @@ using namespace std;
 #include "Response.h"
 #include "Methods.h"
 #include "StatusCodes.h"
-#include "FileHandler.h"
+#include "HTTPFileHandler.h"
+
+void getGETResponse(const Request& requestToHandle, Response& response, HTTPFileHandler fileHandler);
 
 struct SocketState
 {
@@ -248,56 +250,31 @@ void sendMessage(int index, SocketState* sockets)
 	switch (requestToHandle->getMethod())
 	{
 		case eMethod::HTTP_GET:
-		{
-			string file = fileHandler.getFileInStream(requestToHandle->getPath(), &responseCode);
-			response.setStatusCode(responseCode);
-			response.setHeaderInMap(CONTENT_TYPE, "text/html");
-
-			if (responseCode == HTTP_Not_Found)
-			{
-				response.setHeaderInMap(CONTENT_LENGTH, "0");
-				response.setReasonPhrase("Not Found");
-			}
-			else if (responseCode == HTTP_No_Content)
-			{
-				response.setHeaderInMap(CONTENT_LENGTH, "0");
-				response.setReasonPhrase("No Content");
-			}
-			else
-			{
-				response.setHeaderInMap(CONTENT_LENGTH, to_string(file.size()));
-				response.setReasonPhrase("OK");
-				response.setBody(file);
-			}
+			getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
 			break;
-		}
 
 		case eMethod::HTTP_POST:
-		{
+			getPUTOrPOSTResponse(*requestToHandle, &response, &fileHandler);
 			break;
-		}
-	
+
 		case eMethod::HTTP_PUT:
-	
+			getPUTOrPOSTResponse(*requestToHandle, &response, &fileHandler);
 			break;
 	
 		case eMethod::HTTP_DELETE:
-	
+			getDELETEResponse(*requestToHandle, &response, &fileHandler);
 			break;
 	
 		case eMethod::HTTP_HEAD:
-	
+			getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
 			break;
 	
 		case eMethod::HTTP_OPTIONS:
-	
+			getOPTIONSResponse(*requestToHandle, &response, &fileHandler);
 			break;
 	
 		case eMethod::HTTP_TRACE:
-
-			break;
-
-		default:
+			getTRACEResponse(*requestToHandle, &response, &fileHandler);
 			break;
 	}
 	
@@ -339,4 +316,116 @@ eMethod parseMethod(const string& method)
 
 	else
 		return eMethod::HTTP_TRACE;
+}
+
+void getGETOrHEADResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler ) {
+
+	int responseCode;
+	eMethod method = requestToHandle.getMethod();
+	string file = fileHandler->getFileInStream(requestToHandle.getPath(), &responseCode);
+	response->setStatusCode(responseCode);
+	response->setHeaderInMap(CONTENT_TYPE, "text/html");
+
+	if (responseCode == HTTP_Not_Found)
+	{
+		response->setHeaderInMap(CONTENT_LENGTH, "0");
+		response->setReasonPhrase("Not Found");
+	}
+	else if (responseCode == HTTP_No_Content)
+	{
+		response->setHeaderInMap(CONTENT_LENGTH, "0");
+		response->setReasonPhrase("No Content");
+	}
+	else
+	{
+		response->setReasonPhrase("OK");
+		if (method == eMethod::HTTP_GET)
+		{
+			response->setHeaderInMap(CONTENT_LENGTH, to_string(file.size()));
+			response->setBody(file);
+		}
+		else
+		{
+			response->setHeaderInMap(CONTENT_LENGTH, "0");
+		}
+	}
+}
+
+void getPUTOrPOSTResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
+{
+	int responseCode;
+	eMethod method = requestToHandle.getMethod();
+	if (method == eMethod::HTTP_GET) {
+		responseCode = fileHandler->createAndWriteIntoAFileForPUT(requestToHandle.getPath(), requestToHandle.getBody());
+	}
+	else {
+		responseCode = fileHandler->createAndWriteIntoAFileForPOST(requestToHandle.getPath(), requestToHandle.getBody());
+	}
+	
+	response->setStatusCode(responseCode);
+	response->setHeaderInMap(CONTENT_TYPE, "text/http");
+	response->setHeaderInMap(CONTENT_LENGTH, "0");
+	switch (responseCode)
+	{
+	case HTTP_OK:
+		response->setReasonPhrase("OK");
+		if (method == eMethod::HTTP_POST) {
+			cout << requestToHandle.getBody() << "\n";
+		}
+		break;
+	case HTTP_No_Content:
+		response->setReasonPhrase("No Content");
+		break;
+	case HTTP_Not_Implemented:
+		response->setReasonPhrase("Not Implemented");
+		break;
+	case HTTP_Internal_Server_Error:
+		response->setReasonPhrase("Internal Server Error");
+		break;
+	case HTTP_Created:
+		response->setReasonPhrase("Created");
+		break;
+	}
+}
+
+void getDELETEResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
+{
+	int responseCode;
+	responseCode = fileHandler->deleteFile(requestToHandle.getPath());
+	response->setStatusCode(responseCode);
+	response->setHeaderInMap(CONTENT_TYPE, "text/html");
+	response->setHeaderInMap(CONTENT_LANGUAGE, 0);
+
+	if (responseCode == HTTP_Not_Found)
+	{
+		response->setReasonPhrase("Not Found");
+	}
+	else if (responseCode == HTTP_No_Content)
+	{
+		response->setReasonPhrase("No Content");
+	}
+	else
+	{
+		response->setReasonPhrase("OK");
+	}
+}
+
+void getOPTIONSResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
+{
+	response->setHeaderInMap(CONTENT_TYPE, "text/html");
+	response->setReasonPhrase("OK");
+	response->setStatusCode(HTTP_OK);
+	response->setHeaderInMap(ALLOW, "Allow: PUT, POST, GET, DELETE, OPTIONS, HEAD, TRACE");
+	response->setHeaderInMap(CONTENT_LENGTH, "0");
+}
+
+void getTRACEResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
+{
+	string body = requestToHandle.getRawRequest();
+
+	response->setStatusCode(HTTP_OK);
+	response->setReasonPhrase("OK");
+	response->setHeaderInMap(CONTENT_TYPE, "message/http");
+	response->setHeaderInMap(CONTENT_LENGTH, to_string(body.size()));
+	response->setBody(body);
 }

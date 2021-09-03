@@ -42,6 +42,11 @@ const string& Request::getBody() const
 	return this->body;
 }
 
+const string& Request::getRawRequest() const
+{
+	return this->rawRequest;
+}
+
 void Request::setMethod(eMethod method)
 {
 	this->method = method;
