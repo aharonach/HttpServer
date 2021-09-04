@@ -13,8 +13,6 @@ using namespace std;
 #include "StatusCodes.h"
 #include "HTTPFileHandler.h"
 
-void getGETResponse(const Request& requestToHandle, Response& response, HTTPFileHandler fileHandler);
-
 struct SocketState
 {
 	SOCKET id;			// Socket handle
@@ -25,8 +23,8 @@ struct SocketState
 	vector<Request*> requests;
 };
 
-const int TIME_PORT = 27015;
-const int MAX_SOCKETS = 5;
+const int TIME_PORT = 8080;
+const int MAX_SOCKETS = 50;
 const int EMPTY = 0;
 const int LISTEN = 1;
 const int RECEIVE = 2;
@@ -38,6 +36,12 @@ void removeSocket(int index, SocketState* sockets, int* socketsCount);
 void acceptConnection(int index, SocketState* sockets, int* socketsCount);
 void receiveMessage(int index, SocketState* sockets, int* socketsCount);
 void sendMessage(int index, SocketState* sockets);
+
+void getGETOrHEADResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
+void getPUTOrPOSTResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
+void getDELETEResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
+void getOPTIONSResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
+void getTRACEResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
 
 void main()
 {
@@ -239,11 +243,7 @@ void sendMessage(int index, SocketState* sockets)
 	HTTPFileHandler fileHandler;
 	int responseCode;
 	string responseString;
-	
-	//check request type
-	//action by request
-	//create response
-	
+		
 	Request* requestToHandle = sockets[index].requests.front();
 	sockets[index].requests.erase(sockets[index].requests.begin());
 
@@ -339,6 +339,7 @@ void getGETOrHEADResponse(const Request& requestToHandle, Response* response, HT
 	else
 	{
 		response->setReasonPhrase("OK");
+
 		if (method == eMethod::HTTP_GET)
 		{
 			response->setHeaderInMap(CONTENT_LENGTH, to_string(file.size()));
@@ -355,7 +356,8 @@ void getPUTOrPOSTResponse(const Request& requestToHandle, Response* response, HT
 {
 	int responseCode;
 	eMethod method = requestToHandle.getMethod();
-	if (method == eMethod::HTTP_GET) {
+
+	if (method == eMethod::HTTP_PUT) {
 		responseCode = fileHandler->createAndWriteIntoAFileForPUT(requestToHandle.getPath(), requestToHandle.getBody());
 	}
 	else {
@@ -365,6 +367,7 @@ void getPUTOrPOSTResponse(const Request& requestToHandle, Response* response, HT
 	response->setStatusCode(responseCode);
 	response->setHeaderInMap(CONTENT_TYPE, "text/http");
 	response->setHeaderInMap(CONTENT_LENGTH, "0");
+
 	switch (responseCode)
 	{
 	case HTTP_OK:

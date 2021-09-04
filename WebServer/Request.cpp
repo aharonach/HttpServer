@@ -1,5 +1,7 @@
 #include "Request.h"
 
+using namespace std;
+
 Request::Request(const string& rawRequest)
 {
 	this->rawRequest = rawRequest;
@@ -10,6 +12,11 @@ Request::~Request()
 {
 	this->headers.clear();
 	this->queryParams.clear();
+}
+
+const bool Request::isRequestValid() const
+{
+	return !getHttpVersion().empty() && !getPath().empty() && static_cast<underlying_type<eMethod>::type>(getMethod()) > 0;
 }
 
 eMethod Request::getMethod() const

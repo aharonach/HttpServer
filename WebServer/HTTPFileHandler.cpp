@@ -64,7 +64,8 @@ bool HTTPFileHandler::isFileExists(const string& path) {
 	bool isExist = false;
 
 	file.open(path, ios_base::_Nocreate);
-	if (file) {
+
+	if (file.good()) {
 		isExist = true;
 	}
 
@@ -77,12 +78,12 @@ int HTTPFileHandler::createAndWriteIntoAFileForPUT(const string& path, const str
 
 	fstream file;
 	int response = HTTP_Not_Found;
-	int isWriteSuccessful = -1;	
-	bool isExits = isFileExists(path);
-	if (isFileExists) 
+	int isWriteSuccessful = -1;
+
+	if (isFileExists(path))
 	{
 		file.open(path, ios_base::out);
-		if (file) {
+		if (file.good()) {
 			isWriteSuccessful = writeIntoAFile(file, content);
 			if (isWriteSuccessful > 0) {
 				response = HTTP_OK;
@@ -104,7 +105,7 @@ int HTTPFileHandler::createAndWriteIntoAFileForPUT(const string& path, const str
 	else 
 	{
 		file.open(path, ios_base::out);
-		if (file) {
+		if (file.good()) {
 			isWriteSuccessful = writeIntoAFile(file, content);
 			if (isWriteSuccessful >= 0) {
 				response = HTTP_Created;
@@ -130,11 +131,11 @@ int HTTPFileHandler::createAndWriteIntoAFileForPOST(const string& path, const st
 	fstream file;
 	int response = HTTP_Not_Found;
 	int isWriteSuccessful = -1;
-	bool isExits = isFileExists(path);
-	if (isFileExists)
+
+	if (isFileExists(path))
 	{
 		file.open(path, ios_base::app);
-		if (file) {
+		if (file.good()) {
 			isWriteSuccessful = writeIntoAFile(file, content);
 			if (isWriteSuccessful > 0) {
 				response = HTTP_OK;
@@ -156,7 +157,7 @@ int HTTPFileHandler::createAndWriteIntoAFileForPOST(const string& path, const st
 	else
 	{
 		file.open(path, ios_base::out);
-		if (file) {
+		if (file.good()) {
 			isWriteSuccessful = writeIntoAFile(file, content);
 			if (isWriteSuccessful >= 0) {
 				response = HTTP_Created;
@@ -180,10 +181,9 @@ int HTTPFileHandler::createAndWriteIntoAFileForPOST(const string& path, const st
 int HTTPFileHandler::deleteFile(const string& path) {
 
 	fstream file;
-	bool isExists = isFileExists(path);
 	int response = HTTP_Not_Found;
 
-	if (isExists) {
+	if (isFileExists(path)) {
 		if (remove(path.c_str()) == 0) {
 			response = HTTP_No_Content;
 		}
