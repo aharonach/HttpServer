@@ -14,7 +14,6 @@ class Request
 private:
 	// Properties
 	string rawRequest;
-
 	eMethod method;
 	string path;
 	unordered_map<string, string> queryParams;
@@ -41,6 +40,7 @@ public:
 	~Request();
 
 	// Public getters
+	const bool isRequestValid() const;
 	eMethod getMethod() const;
 	const string& getPath() const;
 	const string& getQueryParam(const string& field) const;
