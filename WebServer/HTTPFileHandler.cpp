@@ -52,7 +52,7 @@ int HTTPFileHandler::writeIntoAFile(fstream& file, const string& content) {
 
 	if (file.is_open()) {
 		file << content;
-		isSuccessful = content.size();
+		isSuccessful = static_cast<int>(content.size());
 	}
 
 	return isSuccessful;

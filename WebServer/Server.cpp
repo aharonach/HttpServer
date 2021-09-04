@@ -13,8 +13,6 @@ using namespace std;
 #include "StatusCodes.h"
 #include "HTTPFileHandler.h"
 
-void getGETResponse(const Request& requestToHandle, Response& response, HTTPFileHandler fileHandler);
-
 struct SocketState
 {
 	SOCKET id;			// Socket handle
