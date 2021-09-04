@@ -77,6 +77,7 @@ enum StatusType
 //Response headers
 #define	ACCEPT_RANGES "Accept-Ranges"
 #define	AGE "Age"
+#define DATE "Date"
 #define	ETAG "ETag"
 #define	LOCATION "Location"
 #define	PROXY_AUTHENTICATE "Proxy-Authenticate"

@@ -3,6 +3,12 @@
 #include <iostream>
 #include <fstream>
 #include "StatusCodes.h"
+#include "Request.h"
+#include <algorithm>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+
 
 using namespace std;
 
@@ -11,10 +17,11 @@ private:
 	const string ROOT_PATH = "www";
 
 public:
-	string getFileInStream(const string& path, int* statusCode);
+	string getFileInStream(int* statusCode, const Request& request);
 	int writeIntoAFile(fstream& file, const string& content);
 	bool isFileExists(const string& path);
-	int createAndWriteIntoAFileForPUT(const string& path, const string& content);
-	int createAndWriteIntoAFileForPOST(const string& path, const string& content);
-	int deleteFile(const string& path);
+	int createAndWriteIntoAFileForPUT(const Request& request, const string& content);
+	int createAndWriteIntoAFileForPOST(const Request& request, const string& content);
+	int deleteFile(const Request& request);
+	string getFinalPath(const Request& request);
 };

@@ -20,6 +20,7 @@ private:
 	unordered_map<string, string> headers;
 	string body;
 	string httpVersion;
+	const string root;
 
 	// Private setters, so the request could not be modified outside it.
 	void setMethod(eMethod method);

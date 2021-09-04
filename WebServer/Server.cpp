@@ -12,6 +12,8 @@ using namespace std;
 #include "Methods.h"
 #include "StatusCodes.h"
 #include "HTTPFileHandler.h"
+#include <algorithm>
+#include <time.h>
 
 struct SocketState
 {
@@ -24,12 +26,14 @@ struct SocketState
 };
 
 const int TIME_PORT = 8080;
-const int MAX_SOCKETS = 50;
+const int MAX_SOCKETS = 5;
 const int EMPTY = 0;
 const int LISTEN = 1;
 const int RECEIVE = 2;
 const int IDLE = 3;
 const int SEND = 4;
+static map<int, string> Months = { {1, "Jan"}, {2, "Feb"}, {3, "Mar"}, {4, "Apr"}, {5, "May"}, {6, "Jun"}, {7, "Jul"}, {8, "Aug"}, {9, "Sep"}, {10, "Oct"}, {11, "Nov"}, {12, "Dec"} };
+static map<int, string> Days = { {1, "Sun"}, {2, "Mon"}, {3, "Tue"}, {4, "Wed"}, {5, "Thu"}, {6, "Fri"}, {7, "Sat"} };
 
 bool addSocket(SOCKET id, int what, SocketState* sockets, int* socketsCount);
 void removeSocket(int index, SocketState* sockets, int* socketsCount);
@@ -38,10 +42,12 @@ void receiveMessage(int index, SocketState* sockets, int* socketsCount);
 void sendMessage(int index, SocketState* sockets);
 
 void getGETOrHEADResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
-void getPUTOrPOSTResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
+void getPOSTResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
+void getPUTResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
 void getDELETEResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
 void getOPTIONSResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
 void getTRACEResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler);
+void setResponseTime(Response* response);
 
 void main()
 {
@@ -243,41 +249,81 @@ void sendMessage(int index, SocketState* sockets)
 	HTTPFileHandler fileHandler;
 	int responseCode;
 	string responseString;
+	bool isRequestValid = false;
 		
 	Request* requestToHandle = sockets[index].requests.front();
 	sockets[index].requests.erase(sockets[index].requests.begin());
 
-	switch (requestToHandle->getMethod())
+	isRequestValid = requestToHandle->isRequestValid();
+
+	if (isRequestValid)
 	{
-		case eMethod::HTTP_GET:
-			getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
-			break;
+		try {
+			switch (requestToHandle->getMethod())
+			{
+			case eMethod::HTTP_GET:
+				getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
+				break;
 
-		case eMethod::HTTP_POST:
-			getPUTOrPOSTResponse(*requestToHandle, &response, &fileHandler);
-			break;
+			case eMethod::HTTP_POST:
+				getPOSTResponse(*requestToHandle, &response, &fileHandler);
+				break;
 
-		case eMethod::HTTP_PUT:
-			getPUTOrPOSTResponse(*requestToHandle, &response, &fileHandler);
-			break;
-	
-		case eMethod::HTTP_DELETE:
-			getDELETEResponse(*requestToHandle, &response, &fileHandler);
-			break;
-	
-		case eMethod::HTTP_HEAD:
-			getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
-			break;
-	
-		case eMethod::HTTP_OPTIONS:
-			getOPTIONSResponse(*requestToHandle, &response, &fileHandler);
-			break;
-	
-		case eMethod::HTTP_TRACE:
-			getTRACEResponse(*requestToHandle, &response, &fileHandler);
-			break;
+			case eMethod::HTTP_PUT:
+				getPUTResponse(*requestToHandle, &response, &fileHandler);
+				break;
+
+			case eMethod::HTTP_DELETE:
+				getDELETEResponse(*requestToHandle, &response, &fileHandler);
+				break;
+
+			case eMethod::HTTP_HEAD:
+				getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
+				break;
+
+			case eMethod::HTTP_OPTIONS:
+				getOPTIONSResponse(*requestToHandle, &response, &fileHandler);
+				break;
+
+			case eMethod::HTTP_TRACE:
+				getTRACEResponse(*requestToHandle, &response, &fileHandler);
+				break;
+			}
+		}
+		catch (const runtime_error& re)
+		{
+			string body = re.what();
+			response.setStatusCode(HTTP_Internal_Server_Error);
+			response.setReasonPhrase("Internal Server Error");
+			response.setHeaderInMap(CONTENT_LENGTH, to_string(body.size()));
+			response.setHeaderInMap(CONTENT_TYPE, "text/html");
+			response.setBody(body);
+		}
+		catch (const exception& ex)
+		{
+			string body = ex.what();
+			response.setStatusCode(HTTP_Internal_Server_Error);
+			response.setReasonPhrase("Internal Server Error");
+			response.setHeaderInMap(CONTENT_LENGTH, to_string(body.size()));
+			response.setHeaderInMap(CONTENT_TYPE, "text/html");
+			response.setBody(body);
+		}
+		catch (...) {
+			response.setStatusCode(HTTP_Internal_Server_Error);
+			response.setReasonPhrase("Internal Server Error");
+			response.setHeaderInMap(CONTENT_LENGTH, "0");
+			response.setHeaderInMap(CONTENT_TYPE, "text/html");
+		}
+	}
+	else
+	{
+		response.setStatusCode(HTTP_Bad_Request);
+		response.setReasonPhrase("Bad Request");
+		response.setHeaderInMap(CONTENT_LENGTH, "0");
+		response.setHeaderInMap(CONTENT_TYPE, "text/html");
 	}
 	
+	setResponseTime(&response);
 	responseString = response.createReponseString();
 
 	bytesSent = send(msgSocket, responseString.c_str(), responseString.size(), 0);
@@ -322,7 +368,7 @@ void getGETOrHEADResponse(const Request& requestToHandle, Response* response, HT
 
 	int responseCode;
 	eMethod method = requestToHandle.getMethod();
-	string file = fileHandler->getFileInStream(requestToHandle.getPath(), &responseCode);
+	string file = fileHandler->getFileInStream(&responseCode, requestToHandle);
 	response->setStatusCode(responseCode);
 	response->setHeaderInMap(CONTENT_TYPE, "text/html");
 
@@ -339,29 +385,42 @@ void getGETOrHEADResponse(const Request& requestToHandle, Response* response, HT
 	else
 	{
 		response->setReasonPhrase("OK");
+		response->setHeaderInMap(CONTENT_LENGTH, to_string(file.size()));
+		response->setHeaderInMap(CONTENT_LANGUAGE, requestToHandle.getQueryParam("lang"));
 
 		if (method == eMethod::HTTP_GET)
 		{
-			response->setHeaderInMap(CONTENT_LENGTH, to_string(file.size()));
 			response->setBody(file);
-		}
-		else
-		{
-			response->setHeaderInMap(CONTENT_LENGTH, "0");
 		}
 	}
 }
 
-void getPUTOrPOSTResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
+void getPOSTResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
+{
+	int responseCode = HTTP_OK;
+	response->setStatusCode(responseCode);
+	response->setHeaderInMap(CONTENT_TYPE, "text/http");
+	response->setHeaderInMap(CONTENT_LENGTH, "0");
+	response->setReasonPhrase("OK");
+	string bodyToPrint = requestToHandle.getBody();
+	int bodyLen = bodyToPrint.size();
+	replace(bodyToPrint.begin(), bodyToPrint.end(), '\r', '\n');
+	cout << "\n****************************\nSERVER LOG - POST\n****************************\n";
+	cout << "" << bodyToPrint;
+	cout << "\n****************************\nSERVER LOG - END\n****************************\n";
+
+}
+
+void getPUTResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
 {
 	int responseCode;
 	eMethod method = requestToHandle.getMethod();
 
 	if (method == eMethod::HTTP_PUT) {
-		responseCode = fileHandler->createAndWriteIntoAFileForPUT(requestToHandle.getPath(), requestToHandle.getBody());
+		responseCode = fileHandler->createAndWriteIntoAFileForPUT(requestToHandle, requestToHandle.getBody());
 	}
 	else {
-		responseCode = fileHandler->createAndWriteIntoAFileForPOST(requestToHandle.getPath(), requestToHandle.getBody());
+		responseCode = HTTP_OK;
 	}
 	
 	response->setStatusCode(responseCode);
@@ -372,9 +431,6 @@ void getPUTOrPOSTResponse(const Request& requestToHandle, Response* response, HT
 	{
 	case HTTP_OK:
 		response->setReasonPhrase("OK");
-		if (method == eMethod::HTTP_POST) {
-			cout << requestToHandle.getBody() << "\n";
-		}
 		break;
 	case HTTP_No_Content:
 		response->setReasonPhrase("No Content");
@@ -394,10 +450,10 @@ void getPUTOrPOSTResponse(const Request& requestToHandle, Response* response, HT
 void getDELETEResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
 {
 	int responseCode;
-	responseCode = fileHandler->deleteFile(requestToHandle.getPath());
+	responseCode = fileHandler->deleteFile(requestToHandle);
 	response->setStatusCode(responseCode);
 	response->setHeaderInMap(CONTENT_TYPE, "text/html");
-	response->setHeaderInMap(CONTENT_LANGUAGE, 0);
+	response->setHeaderInMap(CONTENT_LENGTH, "0");
 
 	if (responseCode == HTTP_Not_Found)
 	{
@@ -418,7 +474,7 @@ void getOPTIONSResponse(const Request& requestToHandle, Response* response, HTTP
 	response->setHeaderInMap(CONTENT_TYPE, "text/html");
 	response->setReasonPhrase("OK");
 	response->setStatusCode(HTTP_OK);
-	response->setHeaderInMap(ALLOW, "Allow: PUT, POST, GET, DELETE, OPTIONS, HEAD, TRACE");
+	response->setHeaderInMap(ALLOW, "PUT, POST, GET, DELETE, OPTIONS, HEAD, TRACE");
 	response->setHeaderInMap(CONTENT_LENGTH, "0");
 }
 
@@ -431,4 +487,29 @@ void getTRACEResponse(const Request& requestToHandle, Response* response, HTTPFi
 	response->setHeaderInMap(CONTENT_TYPE, "message/http");
 	response->setHeaderInMap(CONTENT_LENGTH, to_string(body.size()));
 	response->setBody(body);
+}
+
+void setResponseTime(Response* response)
+{
+	char buffer[255];
+	string timeString;
+	time_t timer;
+	time(&timer);
+	//timeString = ctime(&timer);
+	tm* structuredTime = gmtime(&timer);
+	timeString += Days[structuredTime->tm_wday + 1];
+	timeString += ", ";
+	timeString += to_string(structuredTime->tm_mday);
+	timeString += " ";
+	timeString += Months[structuredTime->tm_mon + 1];
+	timeString += " ";
+	timeString += to_string(structuredTime->tm_year + 1900);
+	timeString += " ";
+	timeString += to_string(structuredTime->tm_hour);
+	timeString += ":";
+	timeString += to_string(structuredTime->tm_min);
+	timeString += ":";
+	timeString += to_string(structuredTime->tm_sec);
+	timeString += " GMT";
+	response->setHeaderInMap(DATE, timeString);
 }

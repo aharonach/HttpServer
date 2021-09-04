@@ -2,7 +2,7 @@
 
 using namespace std;
 
-Request::Request(const string& rawRequest)
+Request::Request(const string& rawRequest): root("www")
 {
 	this->rawRequest = rawRequest;
 	this->parseRequest();
@@ -31,7 +31,12 @@ const string& Request::getPath() const
 
 const string& Request::getQueryParam(const string& field) const
 {
-	return this->queryParams.at(field);
+	try {
+		return this->queryParams.at(field);
+	}
+	catch (...) {
+		return "";
+	}
 }
 
 const string& Request::getHttpVersion() const
@@ -111,7 +116,10 @@ void Request::parseRequest()
 		}
 	}
 
-	getline(requestStream, requestBody);
+	for (string line; getline(requestStream, line); )
+	{
+		requestBody += line;
+	}
 
 	stringstream requestLineStream(requestLine);
 	vector<string> requestLineArray;
@@ -151,6 +159,6 @@ void Request::parseRequest()
 
 	setHttpVersion(requestLineArray[2]);
 	setMethod(parseMethod(requestLineArray[0]));
-	setPath(path);
-	setBody(body);
+	setPath(root + path);
+	setBody(requestBody);
 }
