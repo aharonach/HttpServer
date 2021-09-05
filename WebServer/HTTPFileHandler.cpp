@@ -4,15 +4,14 @@
 #include "HTTPFileHandler.h"
 #include <filesystem>
 #include <algorithm>
-
-
+#include <direct.h>
 
 using namespace std;
 
 string HTTPFileHandler::getFileInStream(int* statusCode, const Request& request)
 {
 	fstream file;
-	string finalPath = getFinalPath(request);
+	string finalPath(getFinalPath(request));
 
 	if(isFileExists(finalPath))
 	{
@@ -73,7 +72,7 @@ int HTTPFileHandler::createAndWriteIntoAFileForPUT(const Request& request, const
 	fstream file;
 	int response = HTTP_Not_Found;
 	int isWriteSuccessful = -1;
-	string finalPath = getFinalPath(request);
+	string finalPath(getFinalPath(request));
 
 	if (isFileExists(finalPath))
 	{
@@ -99,6 +98,9 @@ int HTTPFileHandler::createAndWriteIntoAFileForPUT(const Request& request, const
 	}
 	else 
 	{
+		// Create directories if needed
+		createDirectories(finalPath);
+
 		//check folder and create whats needed
 		file.open(finalPath, ios_base::out);
 		if (file.good()) {
@@ -143,6 +145,7 @@ string HTTPFileHandler::getFinalPath(const Request& request)
 	{
 		finalPath.replace(static_cast<int>(finalPath.size()) - 4, 4, "fr.html");
 	}
+
 	return finalPath;
 }
 
@@ -165,3 +168,30 @@ int HTTPFileHandler::deleteFile(const Request& request) {
 	return response;
 }
 
+void HTTPFileHandler::createDirectories(const string& finalPath) 
+{
+	stringstream pathStream(finalPath);
+	stringstream directoryStream;
+
+	for (string folderPath; getline(pathStream, folderPath, '/'); )
+	{
+		directoryStream << folderPath;
+
+		if (folderPath != "www") {
+			if (folderPath.find(".html") != string::npos) {
+				break;
+			}
+
+			string directoryPath(directoryStream.str());
+			fstream directory(directoryPath);
+
+			if (!directory.good()) {
+				_mkdir(directoryPath.c_str());
+			}
+
+			directory.close();
+		}
+
+		directoryStream << "\\";
+	}
+}

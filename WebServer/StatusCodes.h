@@ -6,21 +6,6 @@
 #define HTTP_Accepted 202
 #define HTTP_Non_Authoritative_Information 203
 #define HTTP_No_Content 204
-#define HTTP_Reset_Content 205
-#define HTTP_Partial_Content 206
-#define HTTP_Multi_Status 207
-#define HTTP_Already_Reported 208
-#define HTTP_IM_Used 226
-
-// 300 Codes
-#define HTTP_Multiple_Choices 300
-#define HTTP_Moved_Permanently 301
-#define HTTP_Found 302
-#define HTTP_See_Other 303
-#define HTTP_Not_Modified 304
-#define HTTP_Use_Proxy 305
-#define HTTP_Temporary_Redirect 307
-#define HTTP_Permanent_Redirect 308
 
 // 400 Codes
 #define HTTP_Bad_Request 400

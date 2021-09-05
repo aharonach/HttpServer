@@ -38,7 +38,7 @@ public:
 	void setHttpVersion(const string& version);
 	void setReasonPhrase(const string& reasonPhrase);
 	void setStatusCode(int statusCode);
-	void setHeaderInMap(const string& key, const string& value);
+	void addHeader(const string& key, const string& value);
 	void setBody(const string& body);
 
 	string createReponseString();

@@ -57,7 +57,7 @@ void Response::setStatusCode(int statusCode)
 	this->statusCode = statusCode;
 }
 
-void Response::setHeaderInMap(const string & key, const string& value)
+void Response::addHeader(const string & key, const string& value)
 {
 	this->headers.insert(make_pair(key, value));
 }

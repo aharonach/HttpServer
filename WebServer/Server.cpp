@@ -92,6 +92,10 @@ void main()
 	}
 	addSocket(listenSocket, LISTEN, sockets, &socketsCount);
 
+	struct timeval timeOut;
+	timeOut.tv_sec = 120;
+	timeOut.tv_usec = 0;
+
 	while (true)
 	{
 		fd_set waitRecv;
@@ -111,7 +115,7 @@ void main()
 		}
 
 		int nfd;
-		nfd = select(0, &waitRecv, &waitSend, NULL, NULL);
+		nfd = select(0, &waitRecv, &waitSend, NULL, &timeOut);
 		if (nfd == SOCKET_ERROR)
 		{
 			cout << "Error at select(): " << WSAGetLastError() << endl;
@@ -192,6 +196,7 @@ void acceptConnection(int index, SocketState* sockets, int* socketsCount)
 		cout << "Error at accept(): " << WSAGetLastError() << endl;
 		return;
 	}
+
 	cout << "Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
 
 	unsigned long flag = 1;
@@ -230,7 +235,6 @@ void receiveMessage(int index, SocketState* sockets, int* socketsCount)
 	else
 	{
 		sockets[index].buffer[bytesRecv] = '\0';
-		cout << "Recieved: " << bytesRecv << " bytes of \"" << sockets[index].buffer << "\" message.\n";
 
 		string buffer(sockets[index].buffer);
 		memset(sockets[index].buffer, 0, sizeof(sockets[index].buffer));
@@ -247,7 +251,6 @@ void sendMessage(int index, SocketState* sockets)
 	SOCKET msgSocket = sockets[index].id;
 	Response response;
 	HTTPFileHandler fileHandler;
-	int responseCode;
 	string responseString;
 	bool isRequestValid = false;
 		
@@ -255,6 +258,7 @@ void sendMessage(int index, SocketState* sockets)
 	sockets[index].requests.erase(sockets[index].requests.begin());
 
 	isRequestValid = requestToHandle->isRequestValid();
+	setResponseTime(&response);
 
 	if (isRequestValid)
 	{
@@ -295,8 +299,8 @@ void sendMessage(int index, SocketState* sockets)
 			string body = re.what();
 			response.setStatusCode(HTTP_Internal_Server_Error);
 			response.setReasonPhrase("Internal Server Error");
-			response.setHeaderInMap(CONTENT_LENGTH, to_string(body.size()));
-			response.setHeaderInMap(CONTENT_TYPE, "text/html");
+			response.addHeader(CONTENT_LENGTH, to_string(body.size()));
+			response.addHeader(CONTENT_TYPE, "text/html");
 			response.setBody(body);
 		}
 		catch (const exception& ex)
@@ -304,26 +308,25 @@ void sendMessage(int index, SocketState* sockets)
 			string body = ex.what();
 			response.setStatusCode(HTTP_Internal_Server_Error);
 			response.setReasonPhrase("Internal Server Error");
-			response.setHeaderInMap(CONTENT_LENGTH, to_string(body.size()));
-			response.setHeaderInMap(CONTENT_TYPE, "text/html");
+			response.addHeader(CONTENT_LENGTH, to_string(body.size()));
+			response.addHeader(CONTENT_TYPE, "text/html");
 			response.setBody(body);
 		}
 		catch (...) {
 			response.setStatusCode(HTTP_Internal_Server_Error);
 			response.setReasonPhrase("Internal Server Error");
-			response.setHeaderInMap(CONTENT_LENGTH, "0");
-			response.setHeaderInMap(CONTENT_TYPE, "text/html");
+			response.addHeader(CONTENT_LENGTH, "0");
+			response.addHeader(CONTENT_TYPE, "text/html");
 		}
 	}
 	else
 	{
 		response.setStatusCode(HTTP_Bad_Request);
 		response.setReasonPhrase("Bad Request");
-		response.setHeaderInMap(CONTENT_LENGTH, "0");
-		response.setHeaderInMap(CONTENT_TYPE, "text/html");
+		response.addHeader(CONTENT_LENGTH, "0");
+		response.addHeader(CONTENT_TYPE, "text/html");
 	}
-	
-	setResponseTime(&response);
+
 	responseString = response.createReponseString();
 
 	bytesSent = send(msgSocket, responseString.c_str(), responseString.size(), 0);
@@ -332,8 +335,6 @@ void sendMessage(int index, SocketState* sockets)
 		cout << "Error at send(): " << WSAGetLastError() << endl;
 		return;
 	}
-
-	cout << "Sent: " << bytesSent << "\\" << responseString.size() << " bytes of \"" << responseString << "\" message.\n";
 
 	if (sockets[index].requests.empty()) {
 		sockets[index].send = IDLE;
@@ -370,23 +371,23 @@ void getGETOrHEADResponse(const Request& requestToHandle, Response* response, HT
 	eMethod method = requestToHandle.getMethod();
 	string file = fileHandler->getFileInStream(&responseCode, requestToHandle);
 	response->setStatusCode(responseCode);
-	response->setHeaderInMap(CONTENT_TYPE, "text/html");
+	response->addHeader(CONTENT_TYPE, "text/html");
 
 	if (responseCode == HTTP_Not_Found)
 	{
-		response->setHeaderInMap(CONTENT_LENGTH, "0");
+		response->addHeader(CONTENT_LENGTH, "0");
 		response->setReasonPhrase("Not Found");
 	}
 	else if (responseCode == HTTP_No_Content)
 	{
-		response->setHeaderInMap(CONTENT_LENGTH, "0");
+		response->addHeader(CONTENT_LENGTH, "0");
 		response->setReasonPhrase("No Content");
 	}
 	else
 	{
 		response->setReasonPhrase("OK");
-		response->setHeaderInMap(CONTENT_LENGTH, to_string(file.size()));
-		response->setHeaderInMap(CONTENT_LANGUAGE, requestToHandle.getQueryParam("lang"));
+		response->addHeader(CONTENT_LENGTH, to_string(file.size()));
+		response->addHeader(CONTENT_LANGUAGE, requestToHandle.getQueryParam("lang"));
 
 		if (method == eMethod::HTTP_GET)
 		{
@@ -399,8 +400,8 @@ void getPOSTResponse(const Request& requestToHandle, Response* response, HTTPFil
 {
 	int responseCode = HTTP_OK;
 	response->setStatusCode(responseCode);
-	response->setHeaderInMap(CONTENT_TYPE, "text/http");
-	response->setHeaderInMap(CONTENT_LENGTH, "0");
+	response->addHeader(CONTENT_TYPE, "text/html");
+	response->addHeader(CONTENT_LENGTH, "0");
 	response->setReasonPhrase("OK");
 	string bodyToPrint = requestToHandle.getBody();
 	int bodyLen = bodyToPrint.size();
@@ -424,23 +425,27 @@ void getPUTResponse(const Request& requestToHandle, Response* response, HTTPFile
 	}
 	
 	response->setStatusCode(responseCode);
-	response->setHeaderInMap(CONTENT_TYPE, "text/http");
-	response->setHeaderInMap(CONTENT_LENGTH, "0");
+	response->addHeader(CONTENT_TYPE, "text/html");
+	response->addHeader(CONTENT_LENGTH, "0");
 
 	switch (responseCode)
 	{
 	case HTTP_OK:
 		response->setReasonPhrase("OK");
 		break;
+
 	case HTTP_No_Content:
 		response->setReasonPhrase("No Content");
 		break;
+
 	case HTTP_Not_Implemented:
 		response->setReasonPhrase("Not Implemented");
 		break;
+
 	case HTTP_Internal_Server_Error:
 		response->setReasonPhrase("Internal Server Error");
 		break;
+
 	case HTTP_Created:
 		response->setReasonPhrase("Created");
 		break;
@@ -452,8 +457,8 @@ void getDELETEResponse(const Request& requestToHandle, Response* response, HTTPF
 	int responseCode;
 	responseCode = fileHandler->deleteFile(requestToHandle);
 	response->setStatusCode(responseCode);
-	response->setHeaderInMap(CONTENT_TYPE, "text/html");
-	response->setHeaderInMap(CONTENT_LENGTH, "0");
+	response->addHeader(CONTENT_TYPE, "text/html");
+	response->addHeader(CONTENT_LENGTH, "0");
 
 	if (responseCode == HTTP_Not_Found)
 	{
@@ -471,11 +476,11 @@ void getDELETEResponse(const Request& requestToHandle, Response* response, HTTPF
 
 void getOPTIONSResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
 {
-	response->setHeaderInMap(CONTENT_TYPE, "text/html");
+	response->addHeader(CONTENT_TYPE, "text/html");
 	response->setReasonPhrase("OK");
 	response->setStatusCode(HTTP_OK);
-	response->setHeaderInMap(ALLOW, "PUT, POST, GET, DELETE, OPTIONS, HEAD, TRACE");
-	response->setHeaderInMap(CONTENT_LENGTH, "0");
+	response->addHeader(ALLOW, "PUT, POST, GET, DELETE, OPTIONS, HEAD, TRACE");
+	response->addHeader(CONTENT_LENGTH, "0");
 }
 
 void getTRACEResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
@@ -484,32 +489,31 @@ void getTRACEResponse(const Request& requestToHandle, Response* response, HTTPFi
 
 	response->setStatusCode(HTTP_OK);
 	response->setReasonPhrase("OK");
-	response->setHeaderInMap(CONTENT_TYPE, "message/http");
-	response->setHeaderInMap(CONTENT_LENGTH, to_string(body.size()));
+	response->addHeader(CONTENT_TYPE, "message/http");
+	response->addHeader(CONTENT_LENGTH, to_string(body.size()));
 	response->setBody(body);
 }
 
 void setResponseTime(Response* response)
 {
-	char buffer[255];
-	string timeString;
+	stringstream timeString;
 	time_t timer;
 	time(&timer);
 	//timeString = ctime(&timer);
 	tm* structuredTime = gmtime(&timer);
-	timeString += Days[structuredTime->tm_wday + 1];
-	timeString += ", ";
-	timeString += to_string(structuredTime->tm_mday);
-	timeString += " ";
-	timeString += Months[structuredTime->tm_mon + 1];
-	timeString += " ";
-	timeString += to_string(structuredTime->tm_year + 1900);
-	timeString += " ";
-	timeString += to_string(structuredTime->tm_hour);
-	timeString += ":";
-	timeString += to_string(structuredTime->tm_min);
-	timeString += ":";
-	timeString += to_string(structuredTime->tm_sec);
-	timeString += " GMT";
-	response->setHeaderInMap(DATE, timeString);
+	timeString << Days[structuredTime->tm_wday + 1];
+	timeString << ", ";
+	timeString << to_string(structuredTime->tm_mday);
+	timeString << " ";
+	timeString << Months[structuredTime->tm_mon + 1];
+	timeString << " ";
+	timeString << to_string(structuredTime->tm_year + 1900);
+	timeString << " ";
+	timeString << to_string(structuredTime->tm_hour);
+	timeString << ":";
+	timeString << to_string(structuredTime->tm_min);
+	timeString << ":";
+	timeString << to_string(structuredTime->tm_sec);
+	timeString << " GMT";
+	response->addHeader(DATE, timeString.str());
 }
