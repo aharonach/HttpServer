@@ -15,17 +15,8 @@ using namespace std;
 #include <algorithm>
 #include <time.h>
 
-struct SocketState
-{
-	SOCKET id;			// Socket handle
-	int	recv;			// Receiving?
-	int	send;			// Sending?
-	int sendSubType;	// Sending sub-type
-	char buffer[1024];
-	vector<Request*> requests;
-};
-
-const int TIME_PORT = 8080;
+const int LISTEN_PORT = 8080;
+const int TIMEOUT_IN_SECONDS = 120;
 const int MAX_SOCKETS = 5;
 const int EMPTY = 0;
 const int LISTEN = 1;
@@ -34,6 +25,15 @@ const int IDLE = 3;
 const int SEND = 4;
 static map<int, string> Months = { {1, "Jan"}, {2, "Feb"}, {3, "Mar"}, {4, "Apr"}, {5, "May"}, {6, "Jun"}, {7, "Jul"}, {8, "Aug"}, {9, "Sep"}, {10, "Oct"}, {11, "Nov"}, {12, "Dec"} };
 static map<int, string> Days = { {1, "Sun"}, {2, "Mon"}, {3, "Tue"}, {4, "Wed"}, {5, "Thu"}, {6, "Fri"}, {7, "Sat"} };
+
+struct SocketState
+{
+	SOCKET id = 0;
+	int	recv = EMPTY;
+	int	send = EMPTY;
+	time_t lastTime = 0;
+	vector<Request*> requests;
+};
 
 bool addSocket(SOCKET id, int what, SocketState* sockets, int* socketsCount);
 void removeSocket(int index, SocketState* sockets, int* socketsCount);
@@ -73,7 +73,7 @@ void main()
 	sockaddr_in serverService;
 	serverService.sin_family = AF_INET;
 	serverService.sin_addr.s_addr = INADDR_ANY;
-	serverService.sin_port = htons(TIME_PORT);
+	serverService.sin_port = htons(LISTEN_PORT);
 
 	if (SOCKET_ERROR == bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)))
 	{
@@ -93,7 +93,7 @@ void main()
 	addSocket(listenSocket, LISTEN, sockets, &socketsCount);
 
 	struct timeval timeOut;
-	timeOut.tv_sec = 120;
+	timeOut.tv_sec = TIMEOUT_IN_SECONDS;
 	timeOut.tv_usec = 0;
 
 	while (true)
@@ -154,6 +154,23 @@ void main()
 				}
 			}
 		}
+
+		for (int i = 1; i < MAX_SOCKETS; i++)
+		{
+			if (sockets[i].lastTime == 0)
+				continue;
+
+			time_t now;
+			time(&now);
+
+			double timeDiffInSeconds = difftime(now, sockets[i].lastTime);
+
+			if (timeDiffInSeconds >= TIMEOUT_IN_SECONDS) {
+				cout << "Timeout to client " << sockets[i].id << ". the connection is closed. (" << timeDiffInSeconds << " seconds passed)" << endl;
+				closesocket(sockets[i].id);
+				removeSocket(i, sockets, &socketsCount);
+			}
+		}
 	}
 
 	cout << "Closing Connection.\n";
@@ -181,6 +198,7 @@ void removeSocket(int index, SocketState* sockets, int* socketsCount)
 {
 	sockets[index].recv = EMPTY;
 	sockets[index].send = EMPTY;
+	sockets[index].lastTime = 0;
 	(*socketsCount)--;
 }
 
@@ -197,7 +215,7 @@ void acceptConnection(int index, SocketState* sockets, int* socketsCount)
 		return;
 	}
 
-	cout << "Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
+	cout << "Client id: " << msgSocket << ", Address: " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
 
 	unsigned long flag = 1;
 	if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
@@ -208,7 +226,7 @@ void acceptConnection(int index, SocketState* sockets, int* socketsCount)
 	if (addSocket(msgSocket, RECEIVE, sockets, socketsCount) == false)
 	{
 		cout << "\t\tToo many connections, dropped!\n";
-		closesocket(id);
+		closesocket(msgSocket);
 	}
 	return;
 }
@@ -216,8 +234,9 @@ void acceptConnection(int index, SocketState* sockets, int* socketsCount)
 void receiveMessage(int index, SocketState* sockets, int* socketsCount)
 {
 	SOCKET msgSocket = sockets[index].id;
+	char buffer[2048];
 
-	int bytesRecv = recv(msgSocket, sockets[index].buffer, sizeof(sockets[index].buffer) - 1, 0);
+	int bytesRecv = recv(msgSocket, buffer, sizeof(buffer) - 1, 0);
 
 	if (SOCKET_ERROR == bytesRecv)
 	{
@@ -234,13 +253,12 @@ void receiveMessage(int index, SocketState* sockets, int* socketsCount)
 	}
 	else
 	{
-		sockets[index].buffer[bytesRecv] = '\0';
+		buffer[bytesRecv] = '\0';
+		string bufferString(buffer);
 
-		string buffer(sockets[index].buffer);
-		memset(sockets[index].buffer, 0, sizeof(sockets[index].buffer));
-
-		sockets[index].requests.push_back(new Request(buffer));
+		sockets[index].requests.push_back(new Request(bufferString));
 		sockets[index].send = SEND;
+		time(&(sockets[index].lastTime));
 	}
 }
 
@@ -253,78 +271,90 @@ void sendMessage(int index, SocketState* sockets)
 	HTTPFileHandler fileHandler;
 	string responseString;
 	bool isRequestValid = false;
-		
+
 	Request* requestToHandle = sockets[index].requests.front();
 	sockets[index].requests.erase(sockets[index].requests.begin());
 
 	isRequestValid = requestToHandle->isRequestValid();
 	setResponseTime(&response);
+	response.addHeader(HEADER_SERVER, "Aharon & Shir - HttpServer");
 
 	if (isRequestValid)
 	{
-		try {
-			switch (requestToHandle->getMethod())
+		if (requestToHandle->getHttpVersion() != "HTTP/1.1") 
+		{
+			response.setStatusCode(HTTP_HTTP_Version_Not_Supported);
+			response.setReasonPhrase(PHRASE_HTTP_Version_Not_Supported);
+			response.addHeader(HEADER_CONTENT_LENGTH, "0");
+			response.addHeader(HEADER_CONTENT_TYPE, "text/html");
+		}
+		else 
+		{
+			try 
 			{
-			case eMethod::HTTP_GET:
-				getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
-				break;
+				switch (requestToHandle->getMethod())
+				{
+				case eMethod::HTTP_GET:
+					getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
+					break;
 
-			case eMethod::HTTP_POST:
-				getPOSTResponse(*requestToHandle, &response, &fileHandler);
-				break;
+				case eMethod::HTTP_POST:
+					getPOSTResponse(*requestToHandle, &response, &fileHandler);
+					break;
 
-			case eMethod::HTTP_PUT:
-				getPUTResponse(*requestToHandle, &response, &fileHandler);
-				break;
+				case eMethod::HTTP_PUT:
+					getPUTResponse(*requestToHandle, &response, &fileHandler);
+					break;
 
-			case eMethod::HTTP_DELETE:
-				getDELETEResponse(*requestToHandle, &response, &fileHandler);
-				break;
+				case eMethod::HTTP_DELETE:
+					getDELETEResponse(*requestToHandle, &response, &fileHandler);
+					break;
 
-			case eMethod::HTTP_HEAD:
-				getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
-				break;
+				case eMethod::HTTP_HEAD:
+					getGETOrHEADResponse(*requestToHandle, &response, &fileHandler);
+					break;
 
-			case eMethod::HTTP_OPTIONS:
-				getOPTIONSResponse(*requestToHandle, &response, &fileHandler);
-				break;
+				case eMethod::HTTP_OPTIONS:
+					getOPTIONSResponse(*requestToHandle, &response, &fileHandler);
+					break;
 
-			case eMethod::HTTP_TRACE:
-				getTRACEResponse(*requestToHandle, &response, &fileHandler);
-				break;
+				case eMethod::HTTP_TRACE:
+					getTRACEResponse(*requestToHandle, &response, &fileHandler);
+					break;
+				}
 			}
-		}
-		catch (const runtime_error& re)
-		{
-			string body = re.what();
-			response.setStatusCode(HTTP_Internal_Server_Error);
-			response.setReasonPhrase("Internal Server Error");
-			response.addHeader(CONTENT_LENGTH, to_string(body.size()));
-			response.addHeader(CONTENT_TYPE, "text/html");
-			response.setBody(body);
-		}
-		catch (const exception& ex)
-		{
-			string body = ex.what();
-			response.setStatusCode(HTTP_Internal_Server_Error);
-			response.setReasonPhrase("Internal Server Error");
-			response.addHeader(CONTENT_LENGTH, to_string(body.size()));
-			response.addHeader(CONTENT_TYPE, "text/html");
-			response.setBody(body);
-		}
-		catch (...) {
-			response.setStatusCode(HTTP_Internal_Server_Error);
-			response.setReasonPhrase("Internal Server Error");
-			response.addHeader(CONTENT_LENGTH, "0");
-			response.addHeader(CONTENT_TYPE, "text/html");
+			catch (const runtime_error& re)
+			{
+				string body = re.what();
+				response.setStatusCode(HTTP_Internal_Server_Error);
+				response.setReasonPhrase(PHRASE_Internal_Server_Error);
+				response.addHeader(HEADER_CONTENT_LENGTH, to_string(body.size()));
+				response.addHeader(HEADER_CONTENT_TYPE, "text/plain");
+				response.setBody(body);
+			}
+			catch (const exception& ex)
+			{
+				string body = ex.what();
+				response.setStatusCode(HTTP_Internal_Server_Error);
+				response.setReasonPhrase(PHRASE_Internal_Server_Error);
+				response.addHeader(HEADER_CONTENT_LENGTH, to_string(body.size()));
+				response.addHeader(HEADER_CONTENT_TYPE, "text/plain");
+				response.setBody(body);
+			}
+			catch (...) {
+				response.setStatusCode(HTTP_Internal_Server_Error);
+				response.setReasonPhrase(PHRASE_Internal_Server_Error);
+				response.addHeader(HEADER_CONTENT_LENGTH, "0");
+				response.addHeader(HEADER_CONTENT_TYPE, "text/plain");
+			}
 		}
 	}
 	else
 	{
 		response.setStatusCode(HTTP_Bad_Request);
-		response.setReasonPhrase("Bad Request");
-		response.addHeader(CONTENT_LENGTH, "0");
-		response.addHeader(CONTENT_TYPE, "text/html");
+		response.setReasonPhrase(PHRASE_Bad_Request);
+		response.addHeader(HEADER_CONTENT_LENGTH, "0");
+		response.addHeader(HEADER_CONTENT_TYPE, "text/html");
 	}
 
 	responseString = response.createReponseString();
@@ -336,7 +366,8 @@ void sendMessage(int index, SocketState* sockets)
 		return;
 	}
 
-	if (sockets[index].requests.empty()) {
+	if (sockets[index].requests.empty()) 
+	{
 		sockets[index].send = IDLE;
 	}
 }
@@ -365,29 +396,33 @@ eMethod parseMethod(const string& method)
 		return eMethod::HTTP_TRACE;
 }
 
-void getGETOrHEADResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler ) {
-
+void getGETOrHEADResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
+{
 	int responseCode;
 	eMethod method = requestToHandle.getMethod();
 	string file = fileHandler->getFileInStream(&responseCode, requestToHandle);
 	response->setStatusCode(responseCode);
-	response->addHeader(CONTENT_TYPE, "text/html");
+	response->addHeader(HEADER_CONTENT_TYPE, "text/html");
 
 	if (responseCode == HTTP_Not_Found)
 	{
-		response->addHeader(CONTENT_LENGTH, "0");
-		response->setReasonPhrase("Not Found");
+		response->addHeader(HEADER_CONTENT_LENGTH, "0");
+		response->setReasonPhrase(PHRASE_Not_Found);
 	}
 	else if (responseCode == HTTP_No_Content)
 	{
-		response->addHeader(CONTENT_LENGTH, "0");
-		response->setReasonPhrase("No Content");
+		response->addHeader(HEADER_CONTENT_LENGTH, "0");
+		response->setReasonPhrase(PHRASE_No_Content);
 	}
 	else
 	{
-		response->setReasonPhrase("OK");
-		response->addHeader(CONTENT_LENGTH, to_string(file.size()));
-		response->addHeader(CONTENT_LANGUAGE, requestToHandle.getQueryParam("lang"));
+		response->setReasonPhrase(PHRASE_OK);
+		response->addHeader(HEADER_CONTENT_LENGTH, to_string(file.size()));
+
+		if (requestToHandle.getQueryParam("lang") != "") 
+		{
+			response->addHeader(HEADER_CONTENT_LANGUAGE, requestToHandle.getQueryParam("lang"));
+		}
 
 		if (method == eMethod::HTTP_GET)
 		{
@@ -400,16 +435,16 @@ void getPOSTResponse(const Request& requestToHandle, Response* response, HTTPFil
 {
 	int responseCode = HTTP_OK;
 	response->setStatusCode(responseCode);
-	response->addHeader(CONTENT_TYPE, "text/html");
-	response->addHeader(CONTENT_LENGTH, "0");
-	response->setReasonPhrase("OK");
+	response->addHeader(HEADER_CONTENT_TYPE, "text/html");
+	response->addHeader(HEADER_CONTENT_LENGTH, "0");
+	response->setReasonPhrase(PHRASE_OK);
+
 	string bodyToPrint = requestToHandle.getBody();
-	int bodyLen = bodyToPrint.size();
 	replace(bodyToPrint.begin(), bodyToPrint.end(), '\r', '\n');
+
 	cout << "\n****************************\nSERVER LOG - POST\n****************************\n";
 	cout << "" << bodyToPrint;
 	cout << "\n****************************\nSERVER LOG - END\n****************************\n";
-
 }
 
 void getPUTResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
@@ -423,31 +458,31 @@ void getPUTResponse(const Request& requestToHandle, Response* response, HTTPFile
 	else {
 		responseCode = HTTP_OK;
 	}
-	
+
 	response->setStatusCode(responseCode);
-	response->addHeader(CONTENT_TYPE, "text/html");
-	response->addHeader(CONTENT_LENGTH, "0");
+	response->addHeader(HEADER_CONTENT_TYPE, "text/html");
+	response->addHeader(HEADER_CONTENT_LENGTH, "0");
 
 	switch (responseCode)
 	{
 	case HTTP_OK:
-		response->setReasonPhrase("OK");
+		response->setReasonPhrase(PHRASE_OK);
 		break;
 
 	case HTTP_No_Content:
-		response->setReasonPhrase("No Content");
+		response->setReasonPhrase(PHRASE_No_Content);
 		break;
 
 	case HTTP_Not_Implemented:
-		response->setReasonPhrase("Not Implemented");
+		response->setReasonPhrase(PHRASE_Not_Implemented);
 		break;
 
 	case HTTP_Internal_Server_Error:
-		response->setReasonPhrase("Internal Server Error");
+		response->setReasonPhrase(PHRASE_Internal_Server_Error);
 		break;
 
 	case HTTP_Created:
-		response->setReasonPhrase("Created");
+		response->setReasonPhrase(PHRASE_Created);
 		break;
 	}
 }
@@ -457,30 +492,30 @@ void getDELETEResponse(const Request& requestToHandle, Response* response, HTTPF
 	int responseCode;
 	responseCode = fileHandler->deleteFile(requestToHandle);
 	response->setStatusCode(responseCode);
-	response->addHeader(CONTENT_TYPE, "text/html");
-	response->addHeader(CONTENT_LENGTH, "0");
+	response->addHeader(HEADER_CONTENT_TYPE, "text/html");
+	response->addHeader(HEADER_CONTENT_LENGTH, "0");
 
 	if (responseCode == HTTP_Not_Found)
 	{
-		response->setReasonPhrase("Not Found");
+		response->setReasonPhrase(PHRASE_Not_Found);
 	}
 	else if (responseCode == HTTP_No_Content)
 	{
-		response->setReasonPhrase("No Content");
+		response->setReasonPhrase(PHRASE_No_Content);
 	}
 	else
 	{
-		response->setReasonPhrase("OK");
+		response->setReasonPhrase(PHRASE_OK);
 	}
 }
 
 void getOPTIONSResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
 {
-	response->addHeader(CONTENT_TYPE, "text/html");
-	response->setReasonPhrase("OK");
+	response->addHeader(HEADER_CONTENT_TYPE, "text/html");
+	response->setReasonPhrase(PHRASE_OK);
 	response->setStatusCode(HTTP_OK);
-	response->addHeader(ALLOW, "PUT, POST, GET, DELETE, OPTIONS, HEAD, TRACE");
-	response->addHeader(CONTENT_LENGTH, "0");
+	response->addHeader(HEADER_ALLOW, "PUT, POST, GET, DELETE, OPTIONS, HEAD, TRACE");
+	response->addHeader(HEADER_CONTENT_LENGTH, "0");
 }
 
 void getTRACEResponse(const Request& requestToHandle, Response* response, HTTPFileHandler* fileHandler)
@@ -488,9 +523,9 @@ void getTRACEResponse(const Request& requestToHandle, Response* response, HTTPFi
 	string body = requestToHandle.getRawRequest();
 
 	response->setStatusCode(HTTP_OK);
-	response->setReasonPhrase("OK");
-	response->addHeader(CONTENT_TYPE, "message/http");
-	response->addHeader(CONTENT_LENGTH, to_string(body.size()));
+	response->setReasonPhrase(PHRASE_OK);
+	response->addHeader(HEADER_CONTENT_TYPE, "message/http");
+	response->addHeader(HEADER_CONTENT_LENGTH, to_string(body.size()));
 	response->setBody(body);
 }
 
@@ -499,7 +534,6 @@ void setResponseTime(Response* response)
 	stringstream timeString;
 	time_t timer;
 	time(&timer);
-	//timeString = ctime(&timer);
 	tm* structuredTime = gmtime(&timer);
 	timeString << Days[structuredTime->tm_wday + 1];
 	timeString << ", ";
@@ -515,5 +549,5 @@ void setResponseTime(Response* response)
 	timeString << ":";
 	timeString << to_string(structuredTime->tm_sec);
 	timeString << " GMT";
-	response->addHeader(DATE, timeString.str());
+	response->addHeader(HEADER_DATE, timeString.str());
 }

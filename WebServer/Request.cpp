@@ -91,74 +91,80 @@ void Request::setHttpVersion(const string& version)
 
 void Request::parseRequest()
 {
-	stringstream requestStream(this->rawRequest);
-	string requestLine, requestBody;
+	try {
+		stringstream requestStream(this->rawRequest);
+		string requestLine, requestBody;
 
-	getline(requestStream, requestLine);
+		getline(requestStream, requestLine);
 
-	for (string line; getline(requestStream, line); )
-	{
-		if (line.find('\r') != string::npos)
+		for (string line; getline(requestStream, line); )
 		{
-			line.erase(line.size() - 1);
-		}
-
-		// Got to the body of the request. break the loop!
-		if (line.empty())
-		{
-			break;
-		}
-
-		size_t headerSep = line.find(':');
-		if (headerSep != string::npos)
-		{
-			addHeader(line.substr(0, headerSep), line.substr(headerSep + 2));
-		}
-	}
-
-	for (string line; getline(requestStream, line); )
-	{
-		requestBody += line;
-	}
-
-	stringstream requestLineStream(requestLine);
-	vector<string> requestLineArray;
-
-	// Parse the request line (method, path, http version)
-	for (string line; getline(requestLineStream, line, ' '); )
-	{
-		if (line.find('\r') != string::npos)
-		{
-			line.erase(line.size() - 1);
-		}
-
-		requestLineArray.push_back(line);
-	}
-
-	stringstream pathStream(requestLineArray[1]);
-	string path;
-	string queryString;
-
-	getline(pathStream, path, '?');
-	getline(pathStream, queryString);
-
-	// Parse query strings if exists
-	if (!queryString.empty())
-	{
-		stringstream queryStringStream(queryString);
-
-		for (string queryParam; getline(queryStringStream, queryParam, '&'); )
-		{
-			size_t separator = queryParam.find('=');
-			if (separator != string::npos)
+			if (line.find('\r') != string::npos)
 			{
-				addQueryParam(queryParam.substr(0, separator), queryParam.substr(separator + 1));
+				line.erase(line.size() - 1);
+			}
+
+			// Got to the body of the request. break the loop!
+			if (line.empty())
+			{
+				break;
+			}
+
+			size_t headerSep = line.find(':');
+			if (headerSep != string::npos)
+			{
+				addHeader(line.substr(0, headerSep), line.substr(headerSep + 2));
 			}
 		}
-	}
 
-	setHttpVersion(requestLineArray[2]);
-	setMethod(parseMethod(requestLineArray[0]));
-	setPath(root + path);
-	setBody(requestBody);
+		for (string line; getline(requestStream, line); )
+		{
+			requestBody += line;
+		}
+
+		stringstream requestLineStream(requestLine);
+		vector<string> requestLineArray;
+
+		// Parse the request line (method, path, http version)
+		for (string line; getline(requestLineStream, line, ' '); )
+		{
+			if (line.find('\r') != string::npos)
+			{
+				line.erase(line.size() - 1);
+			}
+
+			requestLineArray.push_back(line);
+		}
+
+		stringstream pathStream(requestLineArray[1]);
+		string path;
+		string queryString;
+
+		getline(pathStream, path, '?');
+		getline(pathStream, queryString);
+
+		// Parse query strings if exists
+		if (!queryString.empty())
+		{
+			stringstream queryStringStream(queryString);
+
+			for (string queryParam; getline(queryStringStream, queryParam, '&'); )
+			{
+				size_t separator = queryParam.find('=');
+				if (separator != string::npos)
+				{
+					addQueryParam(queryParam.substr(0, separator), queryParam.substr(separator + 1));
+				}
+			}
+		}
+
+		setHttpVersion(requestLineArray[2]);
+		setMethod(parseMethod(requestLineArray[0]));
+		setPath(root + path);
+		setBody(requestBody);
+	}
+	catch (...) {
+		setHttpVersion("");
+		setPath("");
+	}
 }

@@ -13,30 +13,22 @@ string HTTPFileHandler::getFileInStream(int* statusCode, const Request& request)
 	fstream file;
 	string finalPath(getFinalPath(request));
 
-	if(isFileExists(finalPath))
+	if (isFileExists(finalPath))
 	{
 		file.open(finalPath, ios_base::in);
 
-		// convert file to string
-		string stringToReturn((std::istreambuf_iterator<char>(file)),
-			(std::istreambuf_iterator<char>()));
+		// put the file content into a string
+		string stringToReturn((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
 
-		if (stringToReturn.size() == 0) 
-		{
-			stringToReturn = "No Content";
-			*statusCode = HTTP_No_Content;
-		}
-		else
-		{
-			*statusCode = HTTP_OK;
-		}
+		*statusCode = stringToReturn.size() > 0 ? HTTP_OK : HTTP_No_Content;
 		return stringToReturn;
 	}
 	else
 	{
 		*statusCode = HTTP_Not_Found;
-		return "Not Found";
 	}
+
+	return "";
 }
 
 int HTTPFileHandler::writeIntoAFile(fstream& file, const string& content) {
@@ -52,7 +44,7 @@ int HTTPFileHandler::writeIntoAFile(fstream& file, const string& content) {
 }
 
 bool HTTPFileHandler::isFileExists(const string& path) {
-	
+
 	fstream file;
 	bool isExist = false;
 
@@ -65,7 +57,7 @@ bool HTTPFileHandler::isFileExists(const string& path) {
 	file.close();
 
 	return isExist;
-}	
+}
 
 int HTTPFileHandler::createAndWriteIntoAFileForPUT(const Request& request, const string& content) {
 
@@ -86,17 +78,15 @@ int HTTPFileHandler::createAndWriteIntoAFileForPUT(const Request& request, const
 			{
 				response = HTTP_No_Content;
 			}
-			else
-			{
+			else {
 				response = HTTP_Not_Implemented;
 			}
 		}
-		else
-		{
+		else {
 			response = HTTP_Internal_Server_Error;
 		}
 	}
-	else 
+	else
 	{
 		// Create directories if needed
 		createDirectories(finalPath);
@@ -105,16 +95,12 @@ int HTTPFileHandler::createAndWriteIntoAFileForPUT(const Request& request, const
 		file.open(finalPath, ios_base::out);
 		if (file.good()) {
 			isWriteSuccessful = writeIntoAFile(file, content);
-			if (isWriteSuccessful >= 0) {
-				response = HTTP_Created;
-			}
-			else
-			{
-				response = HTTP_Not_Implemented;
-			}
+			response = isWriteSuccessful >= 0 ? HTTP_Created : HTTP_Not_Implemented;
 		}
-		else
-		{
+		else if (finalPath.find(".html") == string::npos || finalPath.find(".txt") == string::npos) {
+			response = HTTP_Created;
+		}
+		else {
 			response = HTTP_Internal_Server_Error;
 		}
 	}
@@ -133,42 +119,29 @@ string HTTPFileHandler::getFinalPath(const Request& request)
 		finalPath += "index.html";
 	}
 
-	if (request.getQueryParam("lang") == "en")
+	string langSupport(request.getQueryParam("lang"));
+
+	if (langSupport == "en" || langSupport == "he" || langSupport == "fr")
 	{
-		finalPath.replace(static_cast<int>(finalPath.size()) - 4, 4, "en.html");
-	}
-	else if (request.getQueryParam("lang") == "he")
-	{
-		finalPath.replace(static_cast<int>(finalPath.size()) - 4, 4, "he.html");
-	}
-	else if (request.getQueryParam("lang") == "fr")
-	{
-		finalPath.replace(static_cast<int>(finalPath.size()) - 4, 4, "fr.html");
+		finalPath.replace(static_cast<int>(finalPath.size()) - 4, 4, langSupport + ".html");
 	}
 
 	return finalPath;
 }
 
-int HTTPFileHandler::deleteFile(const Request& request) {
-
-	//add supporting removing folders
-	fstream file;
+int HTTPFileHandler::deleteFile(const Request& request)
+{
 	int response = HTTP_Not_Found;
 	string finalPath = getFinalPath(request);
 
 	if (isFileExists(finalPath)) {
-		if (remove(finalPath.c_str()) == 0) {
-			response = HTTP_No_Content;
-		}
-		else {
-			response = HTTP_Accepted;
-		}
+		response = remove(finalPath.c_str()) == 0 ? HTTP_No_Content : HTTP_Accepted;
 	}
-	
+
 	return response;
 }
 
-void HTTPFileHandler::createDirectories(const string& finalPath) 
+void HTTPFileHandler::createDirectories(const string& finalPath)
 {
 	stringstream pathStream(finalPath);
 	stringstream directoryStream;
@@ -178,7 +151,7 @@ void HTTPFileHandler::createDirectories(const string& finalPath)
 		directoryStream << folderPath;
 
 		if (folderPath != "www") {
-			if (folderPath.find(".html") != string::npos) {
+			if (folderPath.find(".html") != string::npos || folderPath.find(".txt") != string::npos) {
 				break;
 			}
 

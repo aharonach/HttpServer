@@ -14,7 +14,6 @@ using namespace std;
 
 class HTTPFileHandler {
 private:
-	const string ROOT_PATH = "www";
 	void createDirectories(const string& path);
 
 public:
