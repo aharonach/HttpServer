@@ -357,6 +357,7 @@ void sendMessage(int index, SocketState* sockets)
 		response.addHeader(HEADER_CONTENT_TYPE, "text/html");
 	}
 
+	delete requestToHandle;
 	responseString = response.createReponseString();
 
 	bytesSent = send(msgSocket, responseString.c_str(), responseString.size(), 0);
